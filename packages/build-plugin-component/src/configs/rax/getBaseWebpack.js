@@ -13,7 +13,9 @@ module.exports = (context, options) => {
   const { isES6, target, name } = options || {};
   const config = new Chain();
 
+  // 生成 babel 配置
   const babelConfig = getBabelConfig({
+    // 是否使用内联设置
     styleSheet: true,
     isES6,
     custom: {
@@ -21,12 +23,15 @@ module.exports = (context, options) => {
     },
   });
 
+  // 设置 babel runtime 别名，很好奇 babel runtime 是怎么引入的？
   setBabelAlias(config);
 
+  // 设置编译目标为 web 环境
   config.target('web');
   config.context(rootDir);
   config.output.publicPath('/');
 
+  // native 模块提取
   config.externals([
     function (ctx, request, callback) {
       if (request.indexOf('@weex-module') !== -1) {
@@ -40,6 +45,7 @@ module.exports = (context, options) => {
     },
   ]);
 
+  // 设置模块的扩展解析顺序
   config.resolve.extensions.merge(['.js', '.json', '.jsx', '.ts', '.tsx', '.html']);
 
   config.module
@@ -59,6 +65,7 @@ module.exports = (context, options) => {
     .use('ts')
     .loader(require.resolve('ts-loader'));
 
+  // 平台代码做 tree-shaking
   if (options.enablePlatformLoader && target) {
     ['jsx', 'tsx'].forEach((rule) => {
       config.module.rule(rule)
@@ -68,6 +75,7 @@ module.exports = (context, options) => {
     });
   }
 
+  // md 文件处理，在这里来引入 md 中的 code 
   config.module
     .rule('md')
     .test(/\.md$/)
@@ -84,8 +92,10 @@ module.exports = (context, options) => {
     .use('source')
     .loader(require.resolve('image-source-loader'));
 
+  // 强制使用磁盘绝对路径，避免兼容性问题
   config.plugin('caseSensitivePaths').use(CaseSensitivePathsPlugin);
 
+  // 错误时不影响输出
   config.plugin('noError').use(webpack.NoEmitOnErrorsPlugin);
 
   // minify
@@ -103,6 +113,7 @@ module.exports = (context, options) => {
     if (options.sourceMap) {
       config.devtool(typeof options.sourceMap === 'string' ? options.sourceMap : 'source-map');
     }
+    // 代码压缩
     config.optimization
       .minimizer('terser')
       .use(TerserPlugin, [
@@ -122,9 +133,12 @@ module.exports = (context, options) => {
       .use(OptimizeCSSAssetsPlugin);
   }
 
+  // 设置包别名，供 demo 文件使用
   if (pkg.name) {
     config.resolve.alias.set(pkg.name, path.resolve(rootDir, 'src/index'));
   }
+
+  // webpackbar 可视化进度
   config
     .plugin('ProgressPlugin')
     .use(ProgressPlugin, [
@@ -133,6 +147,7 @@ module.exports = (context, options) => {
         name: name || target || 'webpack',
       },
     ]);
+  // fix 可能导致的无限循环问题
   // fix: https://github.com/webpack/watchpack/issues/25
   config.plugin('TimeFixPlugin').use(TimeFixPlugin);
 

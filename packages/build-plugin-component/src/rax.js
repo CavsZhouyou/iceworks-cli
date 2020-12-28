@@ -24,47 +24,68 @@ const getDemoConfig = require('./configs/rax/getDemoConfig');
 module.exports = ({ registerTask, registerUserConfig, context, onHook, registerCliOption, onGetWebpackConfig, onGetJestConfig, modifyUserConfig, log }) => {
   const { rootDir, userConfig, command, pkg, commandArgs } = context;
   const { plugins, targets, disableUMD, inlineStyle = true, ...compileOptions } = userConfig;
+
+  // 判断编译目标
   if (!(targets && targets.length)) {
+    // 提示 e.g. 写法有问题
     console.error(chalk.red('rax-plugin-component need to set targets, e.g. ["rax-plugin-component", targets: ["web", "weex"]]'));
     console.log();
     process.exit(1);
   }
+  // 用户参数注册，这两个参数的具体作用是什么？
+  // 经过测试来看，skip-demo 的作用是不编译 demo 文件，但是编译结果中，web 无法正常显示
+  // watch-dist 的作用是只监听变化编译到 dist 目录，不编译 demo 或者 web 这些文件
+  // dist 目录在 start 和 build 时的作用到底是什么？
   const { skipDemo } = commandArgs;
   const watchDist = commandArgs.watchDist || userConfig.watchDist;
   // compatible with rax-seed
+  // 什么是兼容 rax-seed，把 watchDist 变换更新到 userConfig 的原因是为了其他 plugin 使用吗？
   modifyUserConfig('watchDist', !!watchDist);
   // register user config
   registerUserConfig(defaultUserConfig.concat(raxUserConfig));
-  // disable demo when watch dist
 
   let entries = {};
+  // ssr 方案 bundles 暂时不考虑
   let serverBundles = {};
   let demos = [];
 
   // register cli options
+  // 这里感觉没有必要注册 cli 参数，因为并没有在这里根据 cli 参数来做 webpack 配置的修改
   const cliOptions = ['watch-dist', '--skip-demo'];
   registerCliOption(cliOptions.map((name) => ({
     name,
     commands: ['start', 'build'],
   })));
+
+  // 获取兼容的 demo 文件夹目录名称
   const demoDir = getDemoDir(rootDir);
+
+  // 解析 demo md 文件，生成对应 js 文件作为打包 entry
   const getRaxBundles = () => {
     if (demoDir) {
+
+      // 获取并解析 demo 文件，获得了每个 demo md 文件的解析结果，除了 code 和 importCode 外基本都只是用来展示的
       demos = getDemos(path.join(rootDir, demoDir), markdownParser);
+      
       if (demos && demos.length) {
         return generateRaxEntry(demos, rootDir, targets);
       }
     }
     return false;
   };
+
+  // watchDist 为 false 和 skipDemo 为 false 时
   if (!watchDist && !skipDemo) {
+    // 为 demo 文件生成 js entry 
     let raxBundles = getRaxBundles();
     // watch demo changes
+    // 监听 demo 文件夹，当 demo 文件夹下文件发生变化时，重新为 demo 文件生成 js entry，这个应该是和 build-scripts 结合生效的 
     if (command === 'start') {
       const demoWatcher = chokidar.watch(demoDir, {
         ignoreInitial: false,
         interval: 200,
       });
+      // 监听所有类型的文件变化
       demoWatcher.on('all', () => {
         // re-generate entry files when demo changes
         raxBundles = getRaxBundles();
@@ -77,6 +98,7 @@ module.exports = ({ registerTask, registerUserConfig, context, onHook, registerC
       entries = raxBundles.entries;
       serverBundles = raxBundles.serverBundles;
       const demoConfig = getDemoConfig(context, { ...compileOptions, entries, demos });
+      // 编译 portal 文件
       registerTask('component-demo', demoConfig);
     }
   }
@@ -86,14 +108,19 @@ module.exports = ({ registerTask, registerUserConfig, context, onHook, registerC
     targets.forEach((target) => {
       const options = { ...compileOptions, target, inlineStyle };
       if ([WEB, WEEX, NODE].includes(target)) {
+        // 编译 demos 文件
         // eslint-disable-next-line
         const configDev = require(`./configs/rax/${target}/dev`);
         const defaultConfig = getBaseWebpack(context, options);
         configDev(defaultConfig, context, { ...options, entries, serverBundles });
         registerTask(`component-build-${target}`, defaultConfig);
       } else if ([MINIAPP, WECHAT_MINIPROGRAM].includes(target)) {
+        // 获取小程序的配置文件
         options[target] = options[target] || {};
+
+        // 在小程序的原始配置文件中添加一些参数，供解析时使用
         addMiniappTargetParam(target, options[target]);
+
         const config = getMiniappConfig(context, target, options, onGetWebpackConfig);
         registerTask(`component-build-${target}`, config);
       }

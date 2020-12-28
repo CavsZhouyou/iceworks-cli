@@ -1,10 +1,14 @@
 import { createElement, render, Fragment } from 'rax';
 import DriverUniversal from 'driver-universal';
 {{#each demos}}
+// 从 md 文件来导入 组件，md 会通过 webpack loader 解析获得 md 中的 code ，然后找到对应的组件
 import Component from '{{filePath}}';
+
+// 提取 code 后剩余的 md 内容，可能会包含 style 标签
 const markdownContent = `{{{markdownContent}}}`;
 {{/each}}
 if (Component) {
+  // 提取 css 内容，并通过 dangerouslySetInnerHTML 插入到文档中
   const matchCSS = markdownContent.match(/<style>([\s\S]*?)<\/style>/);
   const cssContent = matchCSS ? {__html: matchCSS[1] || ''} : '';
   render(cssContent ? <><style dangerouslySetInnerHTML={cssContent} /><Component /></> : <Component />, document.body, { driver: DriverUniversal, hydrate: true });

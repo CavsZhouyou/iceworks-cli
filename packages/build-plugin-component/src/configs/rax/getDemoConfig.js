@@ -9,8 +9,11 @@ const setCSSRule = require('../../utils/setCSSRule');
 module.exports = (context, options) => {
   const { command, rootDir } = context;
   const { demos, entries } = options;
+  // 获取 webpack 配置
   const config = getBaseWebpack(context, { ...options, name: 'demo' });
+  // 生成 portal 页面路径
   const portalPath = generateRaxDemo(demos, context);
+
   if (command === 'start') {
     config
       .entry('portal')
@@ -23,6 +26,8 @@ module.exports = (context, options) => {
   config.output.filename('[name].js');
   config.output.publicPath('./');
   config.output.path(path.join(rootDir, 'build'));
+
+  // 设置 css 规则
   setCSSRule(config, command !== 'start');
   if (command === 'start') {
     config.output.publicPath('/demo');
@@ -32,6 +37,7 @@ module.exports = (context, options) => {
         .entry(`demo/${entryKey}`)
         .add(entries[entryKey]);
 
+      // 通过 chunk 做到为每个 entry 配置 HtmlWebpackPlugin
       config.plugin(`html4${entryKey}`).use(HtmlWebpackPlugin, [
         {
           inject: true,

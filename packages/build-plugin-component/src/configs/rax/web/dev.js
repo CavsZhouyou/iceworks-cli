@@ -4,6 +4,7 @@ const { hmrClient } = require('rax-compile-config');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const setCSSRule = require('../../../utils/setCSSRule');
 
+// 编译 demos 文件
 module.exports = (config, context, options) => {
   const { entries } = options;
 
